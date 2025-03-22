@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conversor de Divisas</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.0/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 p-6">
+    <div class="max-w-md mx-auto bg-white p-6 rounded-md shadow-md">
+        <h1 class="text-2xl font-bold text-center">Conversor de Divisas</h1>
+        
+        <form id="conversionForm" class="mt-4">
+            <div class="mb-4">
+                <label for="from_currency" class="block">Moneda de Origen</label>
+                <select id="from_currency" class="w-full p-2 border border-gray-300 rounded-md">
+                    <!-- Opciones se llenarán dinámicamente -->
+                </select>
+            </div>
+
+            <div class="mb-4">
+                <label for="to_currency" class="block">Moneda de Destino</label>
+                <select id="to_currency" class="w-full p-2 border border-gray-300 rounded-md">
+                    <!-- Opciones se llenarán dinámicamente -->
+                </select>
+            </div>
+
+            <div class="mb-4">
+                <label for="amount" class="block">Cantidad</label>
+                <input type="number" id="amount" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Cantidad" required>
+            </div>
+
+            <button type="submit" class="w-full rounded bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 focus:outline-none">Convertir</button>
+        </form>
+
+        <div id="result" class="mt-4 text-center">
+            <p class="text-lg font-medium text-gray-700">Monto convertido:</p>
+            <p class="text-3xl font-bold text-blue-600 mt-2">
+                <!-- Aquí se mostrará el monto convertido -->
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Función para cargar las divisas disponibles (pre-cargar una lista de monedas)
+        async function loadCurrencies() {
+            const response = await fetch('http://localhost:8000/convert/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    amount: 1,
+                    from_currency: 'USD',
+                    to_currency: 'EUR'
+                })
+            });
+
+            const data = await response.json();
+
+            console.log(data);
+
+            const currencies = data.rates; // Aquí es donde obtenemos las divisas disponibles
+            const currencyNames = data.currency_names|| {};
+
+            const fromCurrencySelect = document.getElementById('from_currency');
+            const toCurrencySelect = document.getElementById('to_currency');
+            
+            // Limpiar los selectores antes de añadir las nuevas opciones
+            fromCurrencySelect.innerHTML = '';
+            toCurrencySelect.innerHTML = '';
+
+            // Añadir las divisas al dropdown
+            for (const currency in currencies) {
+                // Obtiene el nombre completo de la divisa
+                const currencyName = currencyNames[currency] || currency;// Si no hay nombre, usa el código
+        
+                const option = document.createElement('option');
+                option.value = currency;
+                option.textContent = `${currency} - ${currencyName}`; // Mostrar código + nombre
+                fromCurrencySelect.appendChild(option);
+        
+                const optionCopy = option.cloneNode(true);
+                toCurrencySelect.appendChild(optionCopy);
+            }
+        }
+
+        // Función para convertir las divisas
+        async function convertCurrency(event) {
+            event.preventDefault(); // Evitar que el formulario recargue la página
+
+            const amount = document.getElementById('amount').value;
+            const fromCurrency = document.getElementById('from_currency').value;
+            const toCurrency = document.getElementById('to_currency').value;
+
+            // Evitar llamadas innecesarias (si la cantidad es 0, no realizar la conversión)
+            if (amount <= 0) {
+                return;
+            }
+
+            const response = await fetch('http://localhost:8000/convert/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    amount: parseFloat(amount),
+                    from_currency: fromCurrency,
+                    to_currency: toCurrency
+                })
+            });
+
+            const data = await response.json();
+
+            // Mostrar el resultado en el HTML
+            const resultElement = document.getElementById('result');
+            if (data.converted_amount) {
+                const formattedAmount = new Intl.NumberFormat().format(data.converted_amount.toFixed(2));
+                resultElement.innerHTML = `
+                    <p class="text-lg font-medium text-gray-700">Monto convertido:</p>
+                    <p class="text-3xl font-bold text-blue-600 mt-2">${formattedAmount} ${toCurrency}</p>
+                `;
+            } else {
+                resultElement.innerHTML = "Hubo un error al procesar la conversión.";
+            }
+        }
+
+        // Llamar a la función para cargar divisas cuando la página se carga
+        window.onload = () => {
+            loadCurrencies();
+            document.getElementById('conversionForm').addEventListener('submit', convertCurrency);
+        };
+    </script>
+</body>
+</html>
